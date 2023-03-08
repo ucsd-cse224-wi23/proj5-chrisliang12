@@ -9,9 +9,9 @@ import (
 )
 
 type RPCClient struct {
-	MetaStoreAddr string
-	BaseDir       string
-	BlockSize     int
+	MetaStoreAddrs []string
+	BaseDir        string
+	BlockSize      int
 }
 
 func (surfClient *RPCClient) GetBlockHashes(blockStoreAddr string,
@@ -38,11 +38,11 @@ func (surfClient *RPCClient) GetBlockStoreMap(
 	blockHashesIn []string,
 	blockStoreMap *map[string][]string,
 ) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
 	if err != nil {
 		return err
 	}
-	c := NewMetaStoreClient(conn)
+	c := NewRaftSurfstoreClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -60,11 +60,11 @@ func (surfClient *RPCClient) GetBlockStoreMap(
 }
 
 func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
 	if err != nil {
 		return err
 	}
-	c := NewMetaStoreClient(conn)
+	c := NewRaftSurfstoreClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -145,11 +145,11 @@ func (surfClient *RPCClient) HasBlocks(
 }
 
 func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileMetaData) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
 	if err != nil {
 		return err
 	}
-	c := NewMetaStoreClient(conn)
+	c := NewRaftSurfstoreClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -163,11 +163,11 @@ func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileM
 }
 
 func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersion *int32) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
 	if err != nil {
 		return err
 	}
-	c := NewMetaStoreClient(conn)
+	c := NewRaftSurfstoreClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -203,10 +203,10 @@ func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersio
 var _ ClientInterface = new(RPCClient)
 
 // Create an Surfstore RPC client
-func NewSurfstoreRPCClient(hostPort, baseDir string, blockSize int) RPCClient {
+func NewSurfstoreRPCClient(addrs []string, baseDir string, blockSize int) RPCClient {
 	return RPCClient{
-		MetaStoreAddr: hostPort,
-		BaseDir:       baseDir,
-		BlockSize:     blockSize,
+		MetaStoreAddrs: addrs,
+		BaseDir:        baseDir,
+		BlockSize:      blockSize,
 	}
 }

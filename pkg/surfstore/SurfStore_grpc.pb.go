@@ -26,7 +26,6 @@ type BlockStoreClient interface {
 	GetBlock(ctx context.Context, in *BlockHash, opts ...grpc.CallOption) (*Block, error)
 	PutBlock(ctx context.Context, in *Block, opts ...grpc.CallOption) (*Success, error)
 	HasBlocks(ctx context.Context, in *BlockHashes, opts ...grpc.CallOption) (*BlockHashes, error)
-	GetBlockHashes(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockHashes, error)
 }
 
 type blockStoreClient struct {
@@ -64,15 +63,6 @@ func (c *blockStoreClient) HasBlocks(ctx context.Context, in *BlockHashes, opts 
 	return out, nil
 }
 
-func (c *blockStoreClient) GetBlockHashes(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockHashes, error) {
-	out := new(BlockHashes)
-	err := c.cc.Invoke(ctx, "/surfstore.BlockStore/GetBlockHashes", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // BlockStoreServer is the server API for BlockStore service.
 // All implementations must embed UnimplementedBlockStoreServer
 // for forward compatibility
@@ -80,7 +70,6 @@ type BlockStoreServer interface {
 	GetBlock(context.Context, *BlockHash) (*Block, error)
 	PutBlock(context.Context, *Block) (*Success, error)
 	HasBlocks(context.Context, *BlockHashes) (*BlockHashes, error)
-	GetBlockHashes(context.Context, *emptypb.Empty) (*BlockHashes, error)
 	mustEmbedUnimplementedBlockStoreServer()
 }
 
@@ -96,9 +85,6 @@ func (UnimplementedBlockStoreServer) PutBlock(context.Context, *Block) (*Success
 }
 func (UnimplementedBlockStoreServer) HasBlocks(context.Context, *BlockHashes) (*BlockHashes, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HasBlocks not implemented")
-}
-func (UnimplementedBlockStoreServer) GetBlockHashes(context.Context, *emptypb.Empty) (*BlockHashes, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockHashes not implemented")
 }
 func (UnimplementedBlockStoreServer) mustEmbedUnimplementedBlockStoreServer() {}
 
@@ -167,24 +153,6 @@ func _BlockStore_HasBlocks_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BlockStore_GetBlockHashes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlockStoreServer).GetBlockHashes(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/surfstore.BlockStore/GetBlockHashes",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlockStoreServer).GetBlockHashes(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // BlockStore_ServiceDesc is the grpc.ServiceDesc for BlockStore service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -204,10 +172,6 @@ var BlockStore_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "HasBlocks",
 			Handler:    _BlockStore_HasBlocks_Handler,
 		},
-		{
-			MethodName: "GetBlockHashes",
-			Handler:    _BlockStore_GetBlockHashes_Handler,
-		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "pkg/surfstore/SurfStore.proto",
@@ -219,8 +183,7 @@ var BlockStore_ServiceDesc = grpc.ServiceDesc{
 type MetaStoreClient interface {
 	GetFileInfoMap(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*FileInfoMap, error)
 	UpdateFile(ctx context.Context, in *FileMetaData, opts ...grpc.CallOption) (*Version, error)
-	GetBlockStoreMap(ctx context.Context, in *BlockHashes, opts ...grpc.CallOption) (*BlockStoreMap, error)
-	GetBlockStoreAddrs(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockStoreAddrs, error)
+	GetBlockStoreAddr(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockStoreAddr, error)
 }
 
 type metaStoreClient struct {
@@ -249,18 +212,9 @@ func (c *metaStoreClient) UpdateFile(ctx context.Context, in *FileMetaData, opts
 	return out, nil
 }
 
-func (c *metaStoreClient) GetBlockStoreMap(ctx context.Context, in *BlockHashes, opts ...grpc.CallOption) (*BlockStoreMap, error) {
-	out := new(BlockStoreMap)
-	err := c.cc.Invoke(ctx, "/surfstore.MetaStore/GetBlockStoreMap", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *metaStoreClient) GetBlockStoreAddrs(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockStoreAddrs, error) {
-	out := new(BlockStoreAddrs)
-	err := c.cc.Invoke(ctx, "/surfstore.MetaStore/GetBlockStoreAddrs", in, out, opts...)
+func (c *metaStoreClient) GetBlockStoreAddr(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockStoreAddr, error) {
+	out := new(BlockStoreAddr)
+	err := c.cc.Invoke(ctx, "/surfstore.MetaStore/GetBlockStoreAddr", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -273,8 +227,7 @@ func (c *metaStoreClient) GetBlockStoreAddrs(ctx context.Context, in *emptypb.Em
 type MetaStoreServer interface {
 	GetFileInfoMap(context.Context, *emptypb.Empty) (*FileInfoMap, error)
 	UpdateFile(context.Context, *FileMetaData) (*Version, error)
-	GetBlockStoreMap(context.Context, *BlockHashes) (*BlockStoreMap, error)
-	GetBlockStoreAddrs(context.Context, *emptypb.Empty) (*BlockStoreAddrs, error)
+	GetBlockStoreAddr(context.Context, *emptypb.Empty) (*BlockStoreAddr, error)
 	mustEmbedUnimplementedMetaStoreServer()
 }
 
@@ -288,11 +241,8 @@ func (UnimplementedMetaStoreServer) GetFileInfoMap(context.Context, *emptypb.Emp
 func (UnimplementedMetaStoreServer) UpdateFile(context.Context, *FileMetaData) (*Version, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateFile not implemented")
 }
-func (UnimplementedMetaStoreServer) GetBlockStoreMap(context.Context, *BlockHashes) (*BlockStoreMap, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockStoreMap not implemented")
-}
-func (UnimplementedMetaStoreServer) GetBlockStoreAddrs(context.Context, *emptypb.Empty) (*BlockStoreAddrs, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlockStoreAddrs not implemented")
+func (UnimplementedMetaStoreServer) GetBlockStoreAddr(context.Context, *emptypb.Empty) (*BlockStoreAddr, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockStoreAddr not implemented")
 }
 func (UnimplementedMetaStoreServer) mustEmbedUnimplementedMetaStoreServer() {}
 
@@ -343,38 +293,20 @@ func _MetaStore_UpdateFile_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MetaStore_GetBlockStoreMap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BlockHashes)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MetaStoreServer).GetBlockStoreMap(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/surfstore.MetaStore/GetBlockStoreMap",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MetaStoreServer).GetBlockStoreMap(ctx, req.(*BlockHashes))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _MetaStore_GetBlockStoreAddrs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MetaStore_GetBlockStoreAddr_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MetaStoreServer).GetBlockStoreAddrs(ctx, in)
+		return srv.(MetaStoreServer).GetBlockStoreAddr(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/surfstore.MetaStore/GetBlockStoreAddrs",
+		FullMethod: "/surfstore.MetaStore/GetBlockStoreAddr",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MetaStoreServer).GetBlockStoreAddrs(ctx, req.(*emptypb.Empty))
+		return srv.(MetaStoreServer).GetBlockStoreAddr(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -395,12 +327,424 @@ var MetaStore_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _MetaStore_UpdateFile_Handler,
 		},
 		{
-			MethodName: "GetBlockStoreMap",
-			Handler:    _MetaStore_GetBlockStoreMap_Handler,
+			MethodName: "GetBlockStoreAddr",
+			Handler:    _MetaStore_GetBlockStoreAddr_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "pkg/surfstore/SurfStore.proto",
+}
+
+// RaftSurfstoreClient is the client API for RaftSurfstore service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type RaftSurfstoreClient interface {
+	// raft
+	AppendEntries(ctx context.Context, in *AppendEntryInput, opts ...grpc.CallOption) (*AppendEntryOutput, error)
+	SetLeader(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error)
+	SendHeartbeat(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error)
+	// metastore
+	GetFileInfoMap(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*FileInfoMap, error)
+	UpdateFile(ctx context.Context, in *FileMetaData, opts ...grpc.CallOption) (*Version, error)
+	GetBlockStoreAddr(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockStoreAddr, error)
+	// testing interface
+	GetInternalState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RaftInternalState, error)
+	IsCrashed(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CrashedState, error)
+	Restore(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error)
+	Crash(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error)
+}
+
+type raftSurfstoreClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewRaftSurfstoreClient(cc grpc.ClientConnInterface) RaftSurfstoreClient {
+	return &raftSurfstoreClient{cc}
+}
+
+func (c *raftSurfstoreClient) AppendEntries(ctx context.Context, in *AppendEntryInput, opts ...grpc.CallOption) (*AppendEntryOutput, error) {
+	out := new(AppendEntryOutput)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/AppendEntries", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) SetLeader(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error) {
+	out := new(Success)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/SetLeader", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) SendHeartbeat(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error) {
+	out := new(Success)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/SendHeartbeat", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) GetFileInfoMap(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*FileInfoMap, error) {
+	out := new(FileInfoMap)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/GetFileInfoMap", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) UpdateFile(ctx context.Context, in *FileMetaData, opts ...grpc.CallOption) (*Version, error) {
+	out := new(Version)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/UpdateFile", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) GetBlockStoreAddr(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*BlockStoreAddr, error) {
+	out := new(BlockStoreAddr)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/GetBlockStoreAddr", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) GetInternalState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*RaftInternalState, error) {
+	out := new(RaftInternalState)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/GetInternalState", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) IsCrashed(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CrashedState, error) {
+	out := new(CrashedState)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/IsCrashed", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) Restore(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error) {
+	out := new(Success)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/Restore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *raftSurfstoreClient) Crash(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Success, error) {
+	out := new(Success)
+	err := c.cc.Invoke(ctx, "/surfstore.RaftSurfstore/Crash", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RaftSurfstoreServer is the server API for RaftSurfstore service.
+// All implementations must embed UnimplementedRaftSurfstoreServer
+// for forward compatibility
+type RaftSurfstoreServer interface {
+	// raft
+	AppendEntries(context.Context, *AppendEntryInput) (*AppendEntryOutput, error)
+	SetLeader(context.Context, *emptypb.Empty) (*Success, error)
+	SendHeartbeat(context.Context, *emptypb.Empty) (*Success, error)
+	// metastore
+	GetFileInfoMap(context.Context, *emptypb.Empty) (*FileInfoMap, error)
+	UpdateFile(context.Context, *FileMetaData) (*Version, error)
+	GetBlockStoreAddr(context.Context, *emptypb.Empty) (*BlockStoreAddr, error)
+	// testing interface
+	GetInternalState(context.Context, *emptypb.Empty) (*RaftInternalState, error)
+	IsCrashed(context.Context, *emptypb.Empty) (*CrashedState, error)
+	Restore(context.Context, *emptypb.Empty) (*Success, error)
+	Crash(context.Context, *emptypb.Empty) (*Success, error)
+	mustEmbedUnimplementedRaftSurfstoreServer()
+}
+
+// UnimplementedRaftSurfstoreServer must be embedded to have forward compatible implementations.
+type UnimplementedRaftSurfstoreServer struct {
+}
+
+func (UnimplementedRaftSurfstoreServer) AppendEntries(context.Context, *AppendEntryInput) (*AppendEntryOutput, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AppendEntries not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) SetLeader(context.Context, *emptypb.Empty) (*Success, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetLeader not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) SendHeartbeat(context.Context, *emptypb.Empty) (*Success, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendHeartbeat not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) GetFileInfoMap(context.Context, *emptypb.Empty) (*FileInfoMap, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFileInfoMap not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) UpdateFile(context.Context, *FileMetaData) (*Version, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateFile not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) GetBlockStoreAddr(context.Context, *emptypb.Empty) (*BlockStoreAddr, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlockStoreAddr not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) GetInternalState(context.Context, *emptypb.Empty) (*RaftInternalState, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInternalState not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) IsCrashed(context.Context, *emptypb.Empty) (*CrashedState, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsCrashed not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) Restore(context.Context, *emptypb.Empty) (*Success, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Restore not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) Crash(context.Context, *emptypb.Empty) (*Success, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Crash not implemented")
+}
+func (UnimplementedRaftSurfstoreServer) mustEmbedUnimplementedRaftSurfstoreServer() {}
+
+// UnsafeRaftSurfstoreServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to RaftSurfstoreServer will
+// result in compilation errors.
+type UnsafeRaftSurfstoreServer interface {
+	mustEmbedUnimplementedRaftSurfstoreServer()
+}
+
+func RegisterRaftSurfstoreServer(s grpc.ServiceRegistrar, srv RaftSurfstoreServer) {
+	s.RegisterService(&RaftSurfstore_ServiceDesc, srv)
+}
+
+func _RaftSurfstore_AppendEntries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppendEntryInput)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).AppendEntries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/AppendEntries",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).AppendEntries(ctx, req.(*AppendEntryInput))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_SetLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).SetLeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/SetLeader",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).SetLeader(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_SendHeartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).SendHeartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/SendHeartbeat",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).SendHeartbeat(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_GetFileInfoMap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).GetFileInfoMap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/GetFileInfoMap",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).GetFileInfoMap(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_UpdateFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FileMetaData)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).UpdateFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/UpdateFile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).UpdateFile(ctx, req.(*FileMetaData))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_GetBlockStoreAddr_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).GetBlockStoreAddr(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/GetBlockStoreAddr",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).GetBlockStoreAddr(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_GetInternalState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).GetInternalState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/GetInternalState",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).GetInternalState(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_IsCrashed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).IsCrashed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/IsCrashed",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).IsCrashed(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_Restore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).Restore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/Restore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).Restore(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RaftSurfstore_Crash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftSurfstoreServer).Crash(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/surfstore.RaftSurfstore/Crash",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftSurfstoreServer).Crash(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// RaftSurfstore_ServiceDesc is the grpc.ServiceDesc for RaftSurfstore service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var RaftSurfstore_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "surfstore.RaftSurfstore",
+	HandlerType: (*RaftSurfstoreServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "AppendEntries",
+			Handler:    _RaftSurfstore_AppendEntries_Handler,
 		},
 		{
-			MethodName: "GetBlockStoreAddrs",
-			Handler:    _MetaStore_GetBlockStoreAddrs_Handler,
+			MethodName: "SetLeader",
+			Handler:    _RaftSurfstore_SetLeader_Handler,
+		},
+		{
+			MethodName: "SendHeartbeat",
+			Handler:    _RaftSurfstore_SendHeartbeat_Handler,
+		},
+		{
+			MethodName: "GetFileInfoMap",
+			Handler:    _RaftSurfstore_GetFileInfoMap_Handler,
+		},
+		{
+			MethodName: "UpdateFile",
+			Handler:    _RaftSurfstore_UpdateFile_Handler,
+		},
+		{
+			MethodName: "GetBlockStoreAddr",
+			Handler:    _RaftSurfstore_GetBlockStoreAddr_Handler,
+		},
+		{
+			MethodName: "GetInternalState",
+			Handler:    _RaftSurfstore_GetInternalState_Handler,
+		},
+		{
+			MethodName: "IsCrashed",
+			Handler:    _RaftSurfstore_IsCrashed_Handler,
+		},
+		{
+			MethodName: "Restore",
+			Handler:    _RaftSurfstore_Restore_Handler,
+		},
+		{
+			MethodName: "Crash",
+			Handler:    _RaftSurfstore_Crash_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
