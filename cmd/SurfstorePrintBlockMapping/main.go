@@ -1,7 +1,7 @@
 package main
 
 import (
-	"cse224/proj4/pkg/surfstore"
+	"cse224/proj5/pkg/surfstore"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -11,10 +11,10 @@ import (
 )
 
 // Arguments
-const ARG_COUNT int = 3
+const ARG_COUNT int = 2
 
 // Usage strings
-const USAGE_STRING = "./run-client.sh -d host:port baseDir blockSize"
+const USAGE_STRING = "./run-client.sh -d -f config_file.txt baseDir blockSize"
 
 const (
 	DEBUG_NAME  = "d"
@@ -22,8 +22,8 @@ const (
 )
 
 const (
-	ADDR_NAME  = "host:port"
-	ADDR_USAGE = "IP address and port of the MetaStore the client is syncing to"
+	CONFIG_NAME  = "f config_file.txt"
+	CONFIG_USAGE = "Path to config file that specifies addresses for all Raft nodes"
 )
 
 const (
@@ -45,13 +45,14 @@ func main() {
 		w := flag.CommandLine.Output()
 		fmt.Fprintf(w, "Usage of %s:\n", USAGE_STRING)
 		fmt.Fprintf(w, "  -%s: %v\n", DEBUG_NAME, DEBUG_USAGE)
-		fmt.Fprintf(w, "  %s: %v\n", ADDR_NAME, ADDR_USAGE)
+		fmt.Fprintf(w, "  -%s: %v\n", CONFIG_NAME, CONFIG_USAGE)
 		fmt.Fprintf(w, "  %s: %v\n", BASEDIR_NAME, BASEDIR_USAGE)
 		fmt.Fprintf(w, "  %s: %v\n", BLOCK_NAME, BLOCK_USAGE)
 	}
 
 	// Parse command-line arguments and flags
 	debug := flag.Bool("d", false, DEBUG_USAGE)
+	configFile := flag.String("f", "", "(required) Config file")
 	flag.Parse()
 
 	// Use tail arguments to hold non-flag arguments
@@ -61,10 +62,10 @@ func main() {
 		flag.Usage()
 		os.Exit(EX_USAGE)
 	}
+	addrs := surfstore.LoadRaftConfigFile(*configFile)
 
-	hostPort := args[0]
-	baseDir := args[1]
-	blockSize, err := strconv.Atoi(args[2])
+	baseDir := args[0]
+	blockSize, err := strconv.Atoi(args[1])
 	if err != nil {
 		flag.Usage()
 		os.Exit(EX_USAGE)
@@ -76,7 +77,7 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	rpcClient := surfstore.NewSurfstoreRPCClient(hostPort, baseDir, blockSize)
+	rpcClient := surfstore.NewSurfstoreRPCClient(addrs.RaftAddrs, baseDir, blockSize)
 	PrintBlocksOnEachServer(rpcClient)
 }
 
@@ -87,8 +88,6 @@ func PrintBlocksOnEachServer(client surfstore.RPCClient) {
 		log.Fatal("[Surfstore RPCClient]:", "Error During Fetching All BlockStore Addresses ", err)
 	}
 
-	log.Println("block addrs: ", allAddrs)
-
 	result := "{"
 	for _, addr := range allAddrs {
 		// fmt.Println("Block Server: ", addr)
@@ -96,8 +95,6 @@ func PrintBlocksOnEachServer(client surfstore.RPCClient) {
 		if err = client.GetBlockHashes(addr, &hashes); err != nil {
 			log.Fatal("[Surfstore RPCClient]:", "Error During Fetching Blocks on Block Server ", err)
 		}
-
-		log.Println("hashes: ", hashes)
 
 		for _, hash := range hashes {
 			result += "{" + hash + "," + addr + "},"

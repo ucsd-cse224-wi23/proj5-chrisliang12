@@ -16,17 +16,25 @@ const ARG_COUNT int = 2
 // Usage strings
 const USAGE_STRING = "./run-client.sh -d -f config_file.txt baseDir blockSize"
 
-const DEBUG_NAME = "d"
-const DEBUG_USAGE = "Output log statements"
+const (
+	DEBUG_NAME  = "d"
+	DEBUG_USAGE = "Output log statements"
+)
 
-const CONFIG_NAME = "f config_file.txt"
-const CONFIG_USAGE = "Path to config file that specifies addresses for all Raft nodes"
+const (
+	CONFIG_NAME  = "f config_file.txt"
+	CONFIG_USAGE = "Path to config file that specifies addresses for all Raft nodes"
+)
 
-const BASEDIR_NAME = "baseDir"
-const BASEDIR_USAGE = "Base directory of the client"
+const (
+	BASEDIR_NAME  = "baseDir"
+	BASEDIR_USAGE = "Base directory of the client"
+)
 
-const BLOCK_NAME = "blockSize"
-const BLOCK_USAGE = "Size of the blocks used to fragment files"
+const (
+	BLOCK_NAME  = "blockSize"
+	BLOCK_USAGE = "Size of the blocks used to fragment files"
+)
 
 // Exit codes
 const EX_USAGE int = 64
@@ -71,6 +79,6 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	rpcClient := surfstore.NewSurfstoreRPCClient(addrs, baseDir, blockSize)
+	rpcClient := surfstore.NewSurfstoreRPCClient(addrs.RaftAddrs, baseDir, blockSize)
 	surfstore.ClientSync(rpcClient)
 }
