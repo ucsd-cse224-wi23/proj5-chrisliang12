@@ -2,6 +2,8 @@ package surfstore
 
 import (
 	context "context"
+	"fmt"
+	"strings"
 	"time"
 
 	grpc "google.golang.org/grpc"
@@ -38,43 +40,59 @@ func (surfClient *RPCClient) GetBlockStoreMap(
 	blockHashesIn []string,
 	blockStoreMap *map[string][]string,
 ) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, addr := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			return err
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	bm, err := c.GetBlockStoreMap(ctx, &BlockHashes{Hashes: blockHashesIn})
-	if err != nil {
-		conn.Close()
-		return err
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		bm, err := c.GetBlockStoreMap(ctx, &BlockHashes{Hashes: blockHashesIn})
+		if err != nil {
+			if strings.Contains(err.Error(), ERR_NOT_LEADER.Error()) {
+				continue
+			} else if strings.Contains(err.Error(), ERR_SERVER_CRASHED.Error()) {
+				continue
+			}
+			conn.Close()
+			return err
+		}
+
+		for key, val := range bm.BlockStoreMap {
+			(*blockStoreMap)[key] = val.Hashes
+		}
+		return nil
 	}
 
-	for key, val := range bm.BlockStoreMap {
-		(*blockStoreMap)[key] = val.Hashes
-	}
-
-	return nil
+	return fmt.Errorf("All servers are down")
 }
 
 func (surfClient *RPCClient) GetBlockStoreAddrs(blockStoreAddrs *[]string) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, addr := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		if err != nil {
+			return err
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	baddr, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
-	if err != nil {
-		conn.Close()
-		return err
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		baddr, err := c.GetBlockStoreAddrs(ctx, &emptypb.Empty{})
+		if err != nil {
+			if strings.Contains(err.Error(), ERR_NOT_LEADER.Error()) {
+				continue
+			} else if strings.Contains(err.Error(), ERR_SERVER_CRASHED.Error()) {
+				continue
+			}
+			conn.Close()
+			return err
+		}
+		*blockStoreAddrs = append(*blockStoreAddrs, baddr.BlockStoreAddrs...)
+		return nil
 	}
-	*blockStoreAddrs = append(*blockStoreAddrs, baddr.BlockStoreAddrs...)
-	return nil
+	return fmt.Errorf("all servers are down")
 }
 
 func (surfClient *RPCClient) GetBlock(blockHash string,
@@ -145,59 +163,56 @@ func (surfClient *RPCClient) HasBlocks(
 }
 
 func (surfClient *RPCClient) GetFileInfoMap(serverFileInfoMap *map[string]*FileMetaData) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, addr := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
+		defer conn.Close()
+		if err != nil {
+			return err
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	infoMap, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
-	if err != nil {
-		conn.Close()
-		return err
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		infoMap, err := c.GetFileInfoMap(ctx, &emptypb.Empty{})
+		if err != nil {
+			if strings.Contains(err.Error(), ERR_NOT_LEADER.Error()) {
+				continue
+			} else if strings.Contains(err.Error(), ERR_SERVER_CRASHED.Error()) {
+				continue
+			}
+			return err
+		}
+		*serverFileInfoMap = infoMap.FileInfoMap
+		return nil
 	}
-	*serverFileInfoMap = infoMap.FileInfoMap
-	return conn.Close()
+	return fmt.Errorf("all servers are down")
 }
 
 func (surfClient *RPCClient) UpdateFile(fileMetaData *FileMetaData, latestVersion *int32) error {
-	conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
-	if err != nil {
-		return err
-	}
-	c := NewRaftSurfstoreClient(conn)
+	for _, addr := range surfClient.MetaStoreAddrs {
+		conn, err := grpc.Dial(surfClient.MetaStoreAddrs[0], grpc.WithInsecure())
+		defer conn.Close()
+		if err != nil {
+			return err
+		}
+		c := NewRaftSurfstoreClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	ver, err := c.UpdateFile(ctx, fileMetaData)
-	if err != nil {
-		conn.Close()
-		return err
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		ver, err := c.UpdateFile(ctx, fileMetaData)
+		if err != nil {
+			if strings.Contains(err.Error(), ERR_NOT_LEADER.Error()) {
+				continue
+			} else if strings.Contains(err.Error(), ERR_SERVER_CRASHED.Error()) {
+				continue
+			}
+			return err
+		}
+		*latestVersion = ver.Version
+		return nil
 	}
-	*latestVersion = ver.Version
-	return conn.Close()
+	return fmt.Errorf("all servers are down")
 }
-
-// func (surfClient *RPCClient) GetBlockStoreAddr(blockStoreAddr *string) error {
-// 	conn, err := grpc.Dial(surfClient.MetaStoreAddr, grpc.WithInsecure())
-// 	if err != nil {
-// 		conn.Close()
-// 		return err
-// 	}
-// 	c := NewMetaStoreClient(conn)
-
-// 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-// 	defer cancel()
-// 	blockAddr, err := c.GetBlockStoreAddr(ctx, &emptypb.Empty{})
-// 	if err != nil {
-// 		conn.Close()
-// 		return err
-// 	}
-// 	*blockStoreAddr = blockAddr.Addr
-// 	return conn.Close()
-// }
 
 // This line guarantees all method for RPCClient are implemented
 var _ ClientInterface = new(RPCClient)
