@@ -41,6 +41,7 @@ func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
 
 	isLeaderMutex := sync.RWMutex{}
 	isCrashedMutex := sync.RWMutex{}
+	peerInfoMutex := sync.Mutex{}
 
 	peersInfo := []*PeerInfo{}
 	var selfAddr string
@@ -50,10 +51,12 @@ func NewRaftServer(id int64, config RaftConfig) (*RaftSurfstore, error) {
 			continue
 		}
 		newInfo := PeerInfo{
+			infoMutex:  &peerInfoMutex,
 			serverId:   int64(i),
 			addr:       config.RaftAddrs[i],
 			nextIndex:  0,
 			matchIndex: -1,
+			isFirstMsg: true,
 		}
 		peersInfo = append(peersInfo, &newInfo)
 	}
