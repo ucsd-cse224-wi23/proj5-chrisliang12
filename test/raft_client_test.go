@@ -1,9 +1,10 @@
 package SurfTest
 
 import (
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"os"
 	"testing"
+
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	//	"time"
 )
 
@@ -21,7 +22,7 @@ func TestSyncTwoClientsSameFileLeaderFailure(t *testing.T) {
 	defer worker1.CleanUp()
 	defer worker2.CleanUp()
 
-	//clients add different files
+	// clients add different files
 	file1 := "multi_file1.txt"
 	file2 := "multi_file1.txt"
 	err := worker1.AddFile(file1)
@@ -37,7 +38,7 @@ func TestSyncTwoClientsSameFileLeaderFailure(t *testing.T) {
 		t.FailNow()
 	}
 
-	//client1 syncs
+	// client1 syncs
 	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
 	if err != nil {
 		t.Fatalf("Sync failed")
@@ -49,7 +50,7 @@ func TestSyncTwoClientsSameFileLeaderFailure(t *testing.T) {
 	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
 	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
-	//client2 syncs
+	// client2 syncs
 	err = SyncClient("localhost:8080", "test1", BLOCK_SIZE, cfgPath)
 	if err != nil {
 		t.Fatalf("Sync failed")
@@ -57,7 +58,7 @@ func TestSyncTwoClientsSameFileLeaderFailure(t *testing.T) {
 
 	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
-	//client1 syncs
+	// client1 syncs
 	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
 	if err != nil {
 		t.Fatalf("Sync failed")
@@ -68,7 +69,7 @@ func TestSyncTwoClientsSameFileLeaderFailure(t *testing.T) {
 
 	workingDir, _ := os.Getwd()
 
-	//check client1
+	// check client1
 	_, err = os.Stat(workingDir + "/test0/" + META_FILENAME)
 	if err != nil {
 		t.Fatalf("Could not find meta file for client1")
@@ -93,7 +94,7 @@ func TestSyncTwoClientsSameFileLeaderFailure(t *testing.T) {
 		t.Fatalf("file1 should not change at client1")
 	}
 
-	//check client2
+	// check client2
 	_, err = os.Stat(workingDir + "/test1/" + META_FILENAME)
 	if err != nil {
 		t.Fatalf("Could not find meta file for client2")
@@ -116,5 +117,48 @@ func TestSyncTwoClientsSameFileLeaderFailure(t *testing.T) {
 	}
 	if !c {
 		t.Fatalf("wrong file2 contents at client2")
+	}
+}
+
+func TestSyncTwoClientsClusterFailure(t *testing.T) {
+	t.Logf("client1 syncs with file1. client2 syncs. majority of the cluster crashes. client2 syncs again.")
+	cfgPath := "./config_files/3nodes.txt"
+	test := InitTest(cfgPath)
+	defer EndTest(test)
+	test.Clients[0].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	worker1 := InitDirectoryWorker("test0", SRC_PATH)
+	worker2 := InitDirectoryWorker("test1", SRC_PATH)
+	defer worker1.CleanUp()
+	defer worker2.CleanUp()
+
+	// clients add different files
+	file1 := "multi_file1.txt"
+	if err := worker1.AddFile(file1); err != nil {
+		t.FailNow()
+	}
+
+	// client1 sync with file1
+	if err := SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath); err != nil {
+		t.Fatalf("Client1 Sync failed")
+	}
+
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	// client2 syncs
+	err := SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
+	if err != nil {
+		t.Fatalf("Client2 Sync Failed")
+	}
+
+	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
+	test.Clients[2].Crash(test.Context, &emptypb.Empty{})
+
+	// client2 syncs again, should fail
+
+	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
+	if err == nil {
+		t.Fatalf("SyncClient should fail")
 	}
 }
