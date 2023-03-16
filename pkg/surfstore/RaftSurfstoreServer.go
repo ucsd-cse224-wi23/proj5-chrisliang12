@@ -57,9 +57,11 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 	}
 
 	for {
-		if succ, _ := s.SendHeartbeat(ctx, empty); succ.Flag {
+		succ, _ := s.SendHeartbeat(ctx, empty)
+		if succ.Flag {
 			break
 		}
+		return nil, ERR_MAJORITY_CRASHED
 	}
 
 	return s.metaStore.GetFileInfoMap(ctx, empty)

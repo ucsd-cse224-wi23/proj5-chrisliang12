@@ -147,17 +147,22 @@ func TestSyncTwoClientsClusterFailure(t *testing.T) {
 	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
 
 	// client2 syncs
-	err := SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
+	err := worker1.UpdateFile(file1, "update text")
+
+	err = SyncClient("localhost:8080", "test1", BLOCK_SIZE, cfgPath)
 	if err != nil {
 		t.Fatalf("Client2 Sync Failed")
 	}
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
 
-	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
+	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
 	test.Clients[2].Crash(test.Context, &emptypb.Empty{})
 
-	// client2 syncs again, should fail
+	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
-	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
+	// client2 syncs again, should fail
+	err = SyncClient("localhost:8080", "test1", BLOCK_SIZE, cfgPath)
 	if err == nil {
 		t.Fatalf("SyncClient should fail")
 	}

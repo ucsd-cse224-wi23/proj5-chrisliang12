@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 )
 
 // Implement the logic for a client syncing with the server here.
@@ -24,6 +25,9 @@ func ClientSync(client RPCClient) {
 
 	remoteIndex := make(map[string]*FileMetaData)
 	if err := client.GetFileInfoMap(&remoteIndex); err != nil {
+		if strings.Contains(err.Error(), ERR_MAJORITY_CRASHED.Error()) {
+			log.Fatal(err)
+		}
 		log.Println("Error: loading remote index", err)
 	}
 
