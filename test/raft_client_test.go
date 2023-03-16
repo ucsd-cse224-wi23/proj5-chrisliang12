@@ -167,3 +167,53 @@ func TestSyncTwoClientsClusterFailure(t *testing.T) {
 		t.Fatalf("SyncClient should fail")
 	}
 }
+
+func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
+	t.Logf("leader1 gets several requests while all other nodes are crashed. leader1 crashes. all other nodes are restored. leader2 gets a request. leader1 is restored.")
+	cfgPath := "./config_files/3nodes.txt"
+	test := InitTest(cfgPath)
+	defer EndTest(test)
+	test.Clients[0].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	worker1 := InitDirectoryWorker("test0", SRC_PATH)
+	worker2 := InitDirectoryWorker("test1", SRC_PATH)
+	defer worker1.CleanUp()
+	defer worker2.CleanUp()
+
+	file1 := "multi_file1.txt"
+	file2 := "multi_file1.txt"
+	err := worker1.AddFile(file1)
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = worker1.AddFile(file2)
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = worker1.UpdateFile(file2, "update test")
+	if err != nil {
+		t.FailNow()
+	}
+
+	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
+	test.Clients[2].Crash(test.Context, &emptypb.Empty{})
+
+	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
+	if err == nil {
+		t.Fatalf("Sync should fail")
+	}
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	// leader 1 crashes
+	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
+
+	// all other nodes restore
+	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
+	test.Clients[2].Restore(test.Context, &emptypb.Empty{})
+
+	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+}

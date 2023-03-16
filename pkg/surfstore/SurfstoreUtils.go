@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 )
 
 // Implement the logic for a client syncing with the server here.
@@ -24,7 +25,6 @@ func ClientSync(client RPCClient) {
 
 	remoteIndex := make(map[string]*FileMetaData)
 	if err := client.GetFileInfoMap(&remoteIndex); err != nil {
-		log.Fatal(err)
 		log.Println("Error: loading remote index", err)
 	}
 
@@ -122,7 +122,12 @@ func ClientSync(client RPCClient) {
 			}
 
 			var latestVersion int32
-			client.UpdateFile(&FileMetaData{Filename: filename, Version: int32(localMetaData.Version + 1), BlockHashList: []string{"0"}}, &latestVersion)
+			err := client.UpdateFile(&FileMetaData{Filename: filename, Version: int32(localMetaData.Version + 1), BlockHashList: []string{"0"}}, &latestVersion)
+			if err != nil {
+				if strings.Contains(err.Error(), ERR_MAJORITY_CRASHED.Error()) {
+					log.Fatal(err)
+				}
+			}
 			if latestVersion == localMetaData.Version+1 {
 				localIndex[filename].Version++
 				localIndex[filename].BlockHashList = []string{"0"}
@@ -214,6 +219,9 @@ func upload(client RPCClient, meta *FileMetaData, numBlock int) error {
 	// then update metastore
 	err = client.UpdateFile(&FileMetaData{Filename: meta.Filename, Version: meta.Version + 1, BlockHashList: meta.BlockHashList}, &latestVer)
 	if err != nil {
+		if strings.Contains(err.Error(), ERR_MAJORITY_CRASHED.Error()) {
+			log.Fatal(err)
+		}
 		log.Println("Error: calling UpdateFile() | msg: ", err)
 		return err
 	}

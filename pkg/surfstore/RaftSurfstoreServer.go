@@ -61,7 +61,6 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 		if succ.Flag {
 			break
 		}
-		return nil, ERR_MAJORITY_CRASHED
 	}
 
 	return s.metaStore.GetFileInfoMap(ctx, empty)
@@ -155,6 +154,10 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		if succ.Flag {
 			s.commitIndex++
 			break
+		}
+
+		if !succ.Flag {
+			return &Version{Version: -1}, ERR_MAJORITY_CRASHED
 		}
 	}
 
