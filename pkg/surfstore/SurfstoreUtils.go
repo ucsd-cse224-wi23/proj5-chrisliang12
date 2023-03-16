@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 )
 
 // Implement the logic for a client syncing with the server here.
@@ -124,9 +123,7 @@ func ClientSync(client RPCClient) {
 			var latestVersion int32
 			err := client.UpdateFile(&FileMetaData{Filename: filename, Version: int32(localMetaData.Version + 1), BlockHashList: []string{"0"}}, &latestVersion)
 			if err != nil {
-				if strings.Contains(err.Error(), ERR_MAJORITY_CRASHED.Error()) {
-					log.Fatal(err)
-				}
+				log.Fatal(err)
 			}
 			if latestVersion == localMetaData.Version+1 {
 				localIndex[filename].Version++
@@ -219,9 +216,7 @@ func upload(client RPCClient, meta *FileMetaData, numBlock int) error {
 	// then update metastore
 	err = client.UpdateFile(&FileMetaData{Filename: meta.Filename, Version: meta.Version + 1, BlockHashList: meta.BlockHashList}, &latestVer)
 	if err != nil {
-		if strings.Contains(err.Error(), ERR_MAJORITY_CRASHED.Error()) {
-			log.Fatal(err)
-		}
+		log.Fatal(err)
 		log.Println("Error: calling UpdateFile() | msg: ", err)
 		return err
 	}

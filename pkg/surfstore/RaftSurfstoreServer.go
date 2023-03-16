@@ -155,10 +155,6 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 			s.commitIndex++
 			break
 		}
-
-		if !succ.Flag {
-			return &Version{Version: -1}, ERR_MAJORITY_CRASHED
-		}
 	}
 
 	// NOTE: Commit since majority of nodes have the log
