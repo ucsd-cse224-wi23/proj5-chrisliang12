@@ -42,21 +42,21 @@ type RaftSurfstore struct {
 }
 
 func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty) (*FileInfoMap, error) {
-	s.isCrashedMutex.RLock()
-	isCrashed := s.isCrashed
-	s.isCrashedMutex.RUnlock()
-	if isCrashed {
-		return nil, ERR_SERVER_CRASHED
-	}
-
-	s.isLeaderMutex.RLock()
-	isLeader := s.isLeader
-	s.isLeaderMutex.RUnlock()
-	if !isLeader {
-		return nil, ERR_NOT_LEADER
-	}
-
 	for {
+		s.isCrashedMutex.RLock()
+		isCrashed := s.isCrashed
+		s.isCrashedMutex.RUnlock()
+		if isCrashed {
+			return nil, ERR_SERVER_CRASHED
+		}
+
+		s.isLeaderMutex.RLock()
+		isLeader := s.isLeader
+		s.isLeaderMutex.RUnlock()
+		if !isLeader {
+			return nil, ERR_NOT_LEADER
+		}
+
 		succ, _ := s.SendHeartbeat(ctx, empty)
 		if succ.Flag {
 			break
@@ -317,12 +317,14 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	isCrashed := s.isCrashed
 	s.isCrashedMutex.RUnlock()
 	if isCrashed {
+		log.Println(s.serverId, "  crashed")
 		return &Success{Flag: false}, ERR_SERVER_CRASHED
 	}
 	s.isLeaderMutex.RLock()
 	isLeader := s.isLeader
 	s.isLeaderMutex.RUnlock()
 	if !isLeader {
+		log.Println(s.serverId, " not leader")
 		return &Success{Flag: false}, ERR_NOT_LEADER
 	}
 
@@ -350,6 +352,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	}
 
 	if float64(aliveServerNum) >= math.Ceil(float64(nodeCount+1)/2) {
+		log.Println(s.serverId, " majority alive")
 		isMajAlive = true
 	}
 

@@ -18,9 +18,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const SRC_PATH = "./test_files"
-const BLOCK_SIZE = 1024
-const META_FILENAME = "index.db"
+const (
+	SRC_PATH      = "./test_files"
+	BLOCK_SIZE    = 1024
+	META_FILENAME = "index.db"
+)
 
 func IsTombHashList(hashList []string) bool {
 	return len(hashList) == 1 && hashList[0] == TOMBSTONE_HASH
@@ -151,7 +153,6 @@ func CleanUpDir(dirPath string) {
 
 func AppendFile(filename, message string) error {
 	f, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
-
 	if err != nil {
 		fmt.Println(err)
 		return err
@@ -237,7 +238,6 @@ func SameFile(filename1, filename2 string) (bool, error) {
 }
 
 func SameMeta(meta1, meta2 map[string]*surfstore.FileMetaData) bool {
-
 	for filename1, filemeta1 := range meta1 {
 		filemeta2, exist := meta2[filename1]
 		if !exist ||
@@ -307,7 +307,7 @@ func KillSurfServers(servers []*exec.Cmd) {
 }
 
 func SyncClient(metaAddr, baseDir string, blockSize int, cfgPath string) error {
-	clientCmd := exec.Command("_bin/SurfstoreClientExec", "-f", cfgPath, baseDir, strconv.Itoa(blockSize))
+	clientCmd := exec.Command("_bin/SurfstoreClientExec", "-d", "-f", cfgPath, baseDir, strconv.Itoa(blockSize))
 	clientCmd.Stderr = os.Stderr
 	clientCmd.Stdout = os.Stdout
 

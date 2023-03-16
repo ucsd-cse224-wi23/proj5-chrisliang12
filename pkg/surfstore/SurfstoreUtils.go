@@ -11,6 +11,7 @@ import (
 
 // Implement the logic for a client syncing with the server here.
 func ClientSync(client RPCClient) {
+	log.Println("-----------Start Client Syncing")
 	// read local files
 	localFiles, err := ioutil.ReadDir(client.BaseDir)
 	if err != nil {
@@ -24,8 +25,8 @@ func ClientSync(client RPCClient) {
 
 	remoteIndex := make(map[string]*FileMetaData)
 	if err := client.GetFileInfoMap(&remoteIndex); err != nil {
-		log.Fatal("GetFileInfoMap fail")
 		log.Println("Error: loading remote index", err)
+		log.Fatal("GetFileInfoMap fail")
 	}
 
 	localDirMap := make(map[string][]string)
