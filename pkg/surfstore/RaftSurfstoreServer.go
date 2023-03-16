@@ -59,6 +59,7 @@ func (s *RaftSurfstore) GetFileInfoMap(ctx context.Context, empty *emptypb.Empty
 
 		succ, _ := s.SendHeartbeat(ctx, empty)
 		if succ.Flag {
+			log.Println("!!!GetFileInfoMap Success!!")
 			break
 		}
 	}
@@ -181,6 +182,20 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	for {
 		log.Println(" ")
 		log.Println("----------", s.serverId, " UpdateFile: commit msg start sending----------")
+
+		s.isLeaderMutex.RLock()
+		isLeader := s.isLeader
+		s.isLeaderMutex.RUnlock()
+		if !isLeader {
+			return &Version{Version: -1}, ERR_NOT_LEADER
+		}
+
+		s.isCrashedMutex.RLock()
+		isCrashed := s.isCrashed
+		s.isCrashedMutex.RUnlock()
+		if isCrashed {
+			return &Version{Version: -1}, ERR_SERVER_CRASHED
+		}
 
 		succ, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		if err != nil {

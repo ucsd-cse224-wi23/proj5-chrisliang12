@@ -279,3 +279,104 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 		}
 	}
 }
+
+func TestRaftNewLeaderPushesUpdates(t *testing.T) {
+	t.Logf("leader1 gets a request while the majority of the cluster is down. leader1 crashes. the other nodes come back. leader2 is elected")
+	cfgPath := "./config_files/5nodes.txt"
+	test := InitTest(cfgPath)
+	defer EndTest(test)
+	test.Clients[0].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	worker1 := InitDirectoryWorker("test0", SRC_PATH)
+	worker2 := InitDirectoryWorker("test1", SRC_PATH)
+	defer worker1.CleanUp()
+	defer worker2.CleanUp()
+
+	file1 := "multi_file1.txt"
+	err := worker1.AddFile(file1)
+	if err != nil {
+		t.FailNow()
+	}
+
+	test.Clients[2].Crash(test.Context, &emptypb.Empty{})
+	test.Clients[3].Crash(test.Context, &emptypb.Empty{})
+	test.Clients[4].Crash(test.Context, &emptypb.Empty{})
+
+	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
+	if err == nil {
+		t.Fatalf("Sync should failed")
+	}
+
+	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
+
+	test.Clients[2].Restore(test.Context, &emptypb.Empty{})
+	test.Clients[3].Restore(test.Context, &emptypb.Empty{})
+	test.Clients[4].Restore(test.Context, &emptypb.Empty{})
+
+	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
+
+	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
+	if err != nil {
+		t.Fatalf("Sync failed")
+	}
+
+	internalStateLeader1, err := test.Clients[0].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	internalStateLeader2, err := test.Clients[1].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	internalStateLeader3, err := test.Clients[2].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	internalStateLeader4, err := test.Clients[3].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	internalStateLeader5, err := test.Clients[4].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if internalStateLeader1.Term != 1 {
+		t.Fatalf("leader1 has incorrect meta state")
+	}
+
+	if internalStateLeader2.Term != 2 {
+		t.Fatalf("leader1 has incorrect meta state")
+	}
+
+	if internalStateLeader3.Term != 2 {
+		t.Fatalf("leader1 has incorrect meta state")
+	}
+	if internalStateLeader4.Term != 2 {
+		t.Fatalf("leader1 has incorrect meta state")
+	}
+	if internalStateLeader5.Term != 2 {
+		t.Fatalf("leader1 has incorrect meta state")
+	}
+
+	// if len(internalStateLeader1.MetaMap.FileInfoMap) != 0 {
+	// 	t.Fatalf("leader1 should not commit the data")
+	// }
+	// if len(internalStateLeader2.MetaMap.FileInfoMap) != 0 {
+	// 	t.Fatalf("leader2 should not commit the data")
+	// }
+	// if len(internalStateLeader3.MetaMap.FileInfoMap) != 0 {
+	// 	t.Fatalf("leader3 should not commit the data")
+	// }
+	// if len(internalStateLeader4.MetaMap.FileInfoMap) != 0 {
+	// 	t.Fatalf("leader4 should not commit the data")
+	// }
+	// if len(internalStateLeader5.MetaMap.FileInfoMap) != 0 {
+	// 	t.Fatalf("leader5 should not commit the data")
+	// }
+}
