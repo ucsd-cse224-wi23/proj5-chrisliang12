@@ -230,11 +230,11 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 	// 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term
 	// matches prevLogTerm (§5.3)
-	if int64(len(s.log)-1) < input.PrevLogIndex {
+	if input.PrevLogIndex != -1 && int64(len(s.log)-1) < input.PrevLogIndex {
 		// WARN: comment out the log before submission
 		log.Println(s.addr, "handling: s.log has a shorter length than leader's log")
 		return &res, nil
-	} else if int64(len(s.log)-1) > input.PrevLogIndex {
+	} else if input.PrevLogIndex != -1 && int64(len(s.log)-1) > input.PrevLogIndex {
 		if s.log[input.PrevLogIndex].Term != input.PrevLogTerm {
 			// WARN: comment out the log before submission
 			log.Println(s.addr, "handling: the entry at input.PrevLogIndex is not matched")
