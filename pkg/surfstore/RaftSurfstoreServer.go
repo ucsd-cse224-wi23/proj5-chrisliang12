@@ -164,8 +164,12 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 			return &Version{Version: -1}, err
 		}
 
-		if succ.Flag {
-			s.commitIndex++
+		if succ.Flag && len(s.log)-1 > int(s.commitIndex) {
+			for i := s.commitIndex + 1; i < int64(len(s.log)); i++ {
+				if s.log[i].Term == s.term {
+					s.commitIndex = i
+				}
+			}
 			break
 		}
 	}
@@ -253,10 +257,6 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	// 4. Append any new entries not already in the log
 	if len(input.Entries) > 0 {
 		s.log = append(s.log, input.Entries...)
-	}
-
-	if s.serverId == 0 {
-		log.Println("|||--leader1's log after append entry: ", s.log)
 	}
 
 	// 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
