@@ -255,6 +255,10 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 		s.log = append(s.log, input.Entries...)
 	}
 
+	if s.serverId == 0 {
+		log.Println("|||--leader1's log after append entry: ", s.log)
+	}
+
 	// 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
 	// of last new entry)
 	if input.LeaderCommit > s.commitIndex {

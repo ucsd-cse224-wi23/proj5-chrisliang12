@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	//	"time"
@@ -236,7 +235,7 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	// leader 1 crashes
 	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
 
-	time.Sleep(time.Second)
+	// time.Sleep(time.Second)
 	// all other nodes restore
 	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
 	test.Clients[2].Restore(test.Context, &emptypb.Empty{})
@@ -252,8 +251,9 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	fmt.Println("\n-------- leader 2 start sync--------")
 	err = SyncClient("localhost:8080", "test1", BLOCK_SIZE, cfgPath)
 	if err != nil {
-		t.Fatalf("Sync failed")
+		t.Fatal("Sync failed ", err)
 	}
+
 	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 	fmt.Println("-------- leader 2 end sync-------- \n ")
 
@@ -267,6 +267,8 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
+	fmt.Println("\n------leader1 log (after leader2 sync): \n", internalStateLeader1.Log, "\n ")
+
 	if len(internalStateLeader1.Log) != len(internalStateLeader2.Log) {
 		t.Fatalf("log inconsistent!")
 	}
@@ -276,6 +278,4 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 			t.Fatalf("log inconsistent!")
 		}
 	}
-
-	fmt.Println("\n------leader1 log (after leader2 sync): \n", internalStateLeader1.Log, "\n ")
 }

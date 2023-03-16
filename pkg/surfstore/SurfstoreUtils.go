@@ -24,11 +24,11 @@ func ClientSync(client RPCClient) {
 
 	remoteIndex := make(map[string]*FileMetaData)
 	if err := client.GetFileInfoMap(&remoteIndex); err != nil {
+		log.Fatal("GetFileInfoMap fail")
 		log.Println("Error: loading remote index", err)
 	}
 
 	localDirMap := make(map[string][]string)
-	uploadFail := false
 	for _, fileInfo := range localFiles {
 		if fileInfo.Name() == "index.db" {
 			continue
@@ -69,7 +69,6 @@ func ClientSync(client RPCClient) {
 					err := upload(client, localMetaData, numBlock)
 					if err != nil {
 						log.Println("Error: uploading <", fileInfo.Name(), "> | msg: ", err)
-						uploadFail = true
 					}
 				}
 			} else {
@@ -80,7 +79,6 @@ func ClientSync(client RPCClient) {
 					err := upload(client, &FileMetaData{Filename: fileInfo.Name(), Version: localVersion, BlockHashList: localDirMap[fileInfo.Name()]}, numBlock)
 					if err != nil {
 						log.Println("Error: uploading <", fileInfo.Name(), "> | msg: ", err)
-						uploadFail = true
 					}
 					localIndex[fileInfo.Name()].BlockHashList = localDirMap[fileInfo.Name()]
 					localIndex[fileInfo.Name()].Version++
@@ -98,7 +96,6 @@ func ClientSync(client RPCClient) {
 				}
 				err := upload(client, tempFileMetaData, numBlock)
 				if err != nil {
-					uploadFail = true
 				}
 				if err := client.GetFileInfoMap(&remoteIndex); err != nil {
 					log.Println("Error: loading remote index", err)
@@ -112,10 +109,6 @@ func ClientSync(client RPCClient) {
 				}
 			}
 		}
-	}
-
-	if uploadFail {
-		log.Fatal("Upload Fail")
 	}
 
 	// check for deletion
@@ -133,7 +126,7 @@ func ClientSync(client RPCClient) {
 			var latestVersion int32
 			err := client.UpdateFile(&FileMetaData{Filename: filename, Version: int32(localMetaData.Version + 1), BlockHashList: []string{"0"}}, &latestVersion)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
 			}
 			if latestVersion == localMetaData.Version+1 {
 				localIndex[filename].Version++
