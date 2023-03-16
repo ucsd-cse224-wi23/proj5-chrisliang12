@@ -338,14 +338,6 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 
 	wg.Wait()
 
-	// check if there are new leader since we received response from other server
-	s.isLeaderMutex.RLock()
-	isLeader = s.isLeader
-	s.isLeaderMutex.RUnlock()
-	if !isLeader {
-		return &Success{Flag: false}, ERR_NOT_LEADER
-	}
-
 	for i := 0; i < nodeCount; i++ {
 		r := <-res
 		if r != nil && r.Success {

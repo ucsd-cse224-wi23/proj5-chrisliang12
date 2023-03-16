@@ -195,16 +195,6 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 		t.FailNow()
 	}
 
-	err = worker1.UpdateFile(file1, "adafasdfeq")
-	if err != nil {
-		t.FailNow()
-	}
-
-	err = worker1.UpdateFile(file2, "aadfb")
-	if err != nil {
-		t.FailNow()
-	}
-
 	err = worker2.AddFile(file1)
 	if err != nil {
 		t.FailNow()
@@ -234,12 +224,19 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 		t.Fatalf("Sync should fail")
 	}
 	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
-	time.Sleep(time.Second)
 	fmt.Println("-------- leader 1 end sync-------- \n ")
+
+	internalState_before, err := test.Clients[0].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	fmt.Println("\n------leader1 log (all other nodes crash): \n", internalState_before.Log, "\n ")
 
 	// leader 1 crashes
 	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
 
+	time.Sleep(time.Second)
 	// all other nodes restore
 	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
 	test.Clients[2].Restore(test.Context, &emptypb.Empty{})
@@ -279,4 +276,6 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 			t.Fatalf("log inconsistent!")
 		}
 	}
+
+	fmt.Println("\n------leader1 log (after leader2 sync): \n", internalStateLeader1.Log, "\n ")
 }

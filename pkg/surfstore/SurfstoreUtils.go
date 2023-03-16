@@ -24,11 +24,11 @@ func ClientSync(client RPCClient) {
 
 	remoteIndex := make(map[string]*FileMetaData)
 	if err := client.GetFileInfoMap(&remoteIndex); err != nil {
-		log.Fatal(err)
 		log.Println("Error: loading remote index", err)
 	}
 
 	localDirMap := make(map[string][]string)
+	uploadFail := false
 	for _, fileInfo := range localFiles {
 		if fileInfo.Name() == "index.db" {
 			continue
@@ -69,6 +69,7 @@ func ClientSync(client RPCClient) {
 					err := upload(client, localMetaData, numBlock)
 					if err != nil {
 						log.Println("Error: uploading <", fileInfo.Name(), "> | msg: ", err)
+						uploadFail = true
 					}
 				}
 			} else {
@@ -79,6 +80,7 @@ func ClientSync(client RPCClient) {
 					err := upload(client, &FileMetaData{Filename: fileInfo.Name(), Version: localVersion, BlockHashList: localDirMap[fileInfo.Name()]}, numBlock)
 					if err != nil {
 						log.Println("Error: uploading <", fileInfo.Name(), "> | msg: ", err)
+						uploadFail = true
 					}
 					localIndex[fileInfo.Name()].BlockHashList = localDirMap[fileInfo.Name()]
 					localIndex[fileInfo.Name()].Version++
@@ -95,6 +97,9 @@ func ClientSync(client RPCClient) {
 					tempFileMetaData = &FileMetaData{Filename: fileInfo.Name(), Version: 0, BlockHashList: localDirMap[fileInfo.Name()]}
 				}
 				err := upload(client, tempFileMetaData, numBlock)
+				if err != nil {
+					uploadFail = true
+				}
 				if err := client.GetFileInfoMap(&remoteIndex); err != nil {
 					log.Println("Error: loading remote index", err)
 				}
@@ -107,6 +112,10 @@ func ClientSync(client RPCClient) {
 				}
 			}
 		}
+	}
+
+	if uploadFail {
+		log.Fatal("Upload Fail")
 	}
 
 	// check for deletion
@@ -124,7 +133,7 @@ func ClientSync(client RPCClient) {
 			var latestVersion int32
 			err := client.UpdateFile(&FileMetaData{Filename: filename, Version: int32(localMetaData.Version + 1), BlockHashList: []string{"0"}}, &latestVersion)
 			if err != nil {
-				log.Println(err)
+				log.Fatal(err)
 			}
 			if latestVersion == localMetaData.Version+1 {
 				localIndex[filename].Version++
@@ -217,7 +226,6 @@ func upload(client RPCClient, meta *FileMetaData, numBlock int) error {
 	// then update metastore
 	err = client.UpdateFile(&FileMetaData{Filename: meta.Filename, Version: meta.Version + 1, BlockHashList: meta.BlockHashList}, &latestVer)
 	if err != nil {
-		log.Println(err)
 		log.Println("Error: calling UpdateFile() | msg: ", err)
 		return err
 	}
