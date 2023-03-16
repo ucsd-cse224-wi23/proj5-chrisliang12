@@ -111,6 +111,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	isCrashed := s.isCrashed
 	s.isCrashedMutex.RUnlock()
 	if isCrashed {
+		log.Println("--", s.serverId, " crashed")
 		return nil, ERR_SERVER_CRASHED
 	}
 
@@ -118,6 +119,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	isLeader := s.isLeader
 	s.isLeaderMutex.RUnlock()
 	if !isLeader {
+		log.Println("--", s.serverId, " not leader")
 		return nil, ERR_NOT_LEADER
 	}
 

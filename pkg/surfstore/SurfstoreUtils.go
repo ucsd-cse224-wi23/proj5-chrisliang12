@@ -24,6 +24,7 @@ func ClientSync(client RPCClient) {
 
 	remoteIndex := make(map[string]*FileMetaData)
 	if err := client.GetFileInfoMap(&remoteIndex); err != nil {
+		log.Fatal(err)
 		log.Println("Error: loading remote index", err)
 	}
 
@@ -123,7 +124,7 @@ func ClientSync(client RPCClient) {
 			var latestVersion int32
 			err := client.UpdateFile(&FileMetaData{Filename: filename, Version: int32(localMetaData.Version + 1), BlockHashList: []string{"0"}}, &latestVersion)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
 			}
 			if latestVersion == localMetaData.Version+1 {
 				localIndex[filename].Version++
@@ -216,7 +217,7 @@ func upload(client RPCClient, meta *FileMetaData, numBlock int) error {
 	// then update metastore
 	err = client.UpdateFile(&FileMetaData{Filename: meta.Filename, Version: meta.Version + 1, BlockHashList: meta.BlockHashList}, &latestVer)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		log.Println("Error: calling UpdateFile() | msg: ", err)
 		return err
 	}
