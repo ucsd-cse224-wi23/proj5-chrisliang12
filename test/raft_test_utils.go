@@ -94,7 +94,7 @@ func InitBlockStores(blockStoreAddrs []string) []*exec.Cmd {
 
 func InitRaftServers(cfgPath string, cfg surfstore.RaftConfig) []*exec.Cmd {
 	cmdList := make([]*exec.Cmd, 0)
-	for idx, _ := range cfg.RaftAddrs {
+	for idx := range cfg.RaftAddrs {
 
 		cmd := exec.Command("_bin/SurfstoreRaftServerExec", "-f", cfgPath, "-i", strconv.Itoa(idx), "-d")
 		cmd.Stderr = os.Stderr

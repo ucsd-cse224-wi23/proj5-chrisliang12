@@ -143,8 +143,19 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	// if majority node fail, block the operation until majority recover
 	// NOTE: This round of SendingHeartbeat is for log replication (not commitment)
 	for {
-		log.Println(" ")
-		log.Println("----------", s.serverId, " UpdateFile: log replication starts----------")
+		s.isLeaderMutex.RLock()
+		isLeader := s.isLeader
+		s.isLeaderMutex.RUnlock()
+		if !isLeader {
+			return &Version{Version: -1}, ERR_NOT_LEADER
+		}
+
+		s.isCrashedMutex.RLock()
+		isCrashed := s.isCrashed
+		s.isCrashedMutex.RUnlock()
+		if isCrashed {
+			return &Version{Version: -1}, ERR_SERVER_CRASHED
+		}
 
 		succ, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		if err != nil {
@@ -188,8 +199,6 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
 	// WARN: comment out the log before submission
-	log.Println("")
-	log.Println("----------", s.addr, " Start Append Entries----------")
 	res := AppendEntryOutput{
 		Success:      false,
 		MatchedIndex: -1,
@@ -201,21 +210,15 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	isCrashed := s.isCrashed
 	s.isCrashedMutex.RUnlock()
 	if isCrashed {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, " Crashed")
 		return &res, ERR_SERVER_CRASHED
 	}
 
 	// 1. reply false if term < currTerm
 	if input.Term < s.term {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, "handling: input term < curr term")
 		return &res, nil
 	}
 
 	if input.Term > s.term {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, "handling: input term > curr term")
 		s.term = input.Term
 		res.Term = s.term
 		s.isLeaderMutex.RLock()
@@ -231,22 +234,19 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	// 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term
 	// matches prevLogTerm (§5.3)
 	if input.PrevLogIndex != -1 && int64(len(s.log)-1) < input.PrevLogIndex {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, "handling: s.log has a shorter length than leader's log")
 		return &res, nil
 	} else if input.PrevLogIndex != -1 && int64(len(s.log)-1) > input.PrevLogIndex {
 		if s.log[input.PrevLogIndex].Term != input.PrevLogTerm {
-			// WARN: comment out the log before submission
-			log.Println(s.addr, "handling: the entry at input.PrevLogIndex is not matched")
 			return &res, nil
 		}
 	}
 
 	// 3. If an existing entry conflicts with a new one (same index but different
 	// terms), delete the existing entry and all that follow it (§5.3)
-	if input.PrevLogIndex != -1 {
-		s.log = s.log[:input.PrevLogIndex+1]
-	}
+	// if input.PrevLogIndex != -1 || len(input.Entries) > 0 {
+	// 	s.log = s.log[:input.PrevLogIndex+1]
+	// }
+	s.log = s.log[:input.PrevLogIndex+1]
 
 	// 4. Append any new entries not already in the log
 	if len(input.Entries) > 0 {
@@ -256,9 +256,6 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 	// 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
 	// of last new entry)
 	if input.LeaderCommit > s.commitIndex {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, "handling: new commits")
-
 		currCommitIdx := s.commitIndex
 		s.commitIndex = int64(math.Min(float64(input.LeaderCommit), float64(len(s.log)-1)))
 
@@ -309,24 +306,17 @@ func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Succe
 }
 
 func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
-	// WARN: comment out the log before submission
-	log.Println("")
-	log.Println("----------", s.addr, " start SendHeartbeat----------")
 	// sanity check
 	s.isCrashedMutex.RLock()
 	isCrashed := s.isCrashed
 	s.isCrashedMutex.RUnlock()
 	if isCrashed {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, " Crashed")
 		return &Success{Flag: false}, ERR_SERVER_CRASHED
 	}
 	s.isLeaderMutex.RLock()
 	isLeader := s.isLeader
 	s.isLeaderMutex.RUnlock()
 	if !isLeader {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, " not the leader")
 		return &Success{Flag: false}, ERR_NOT_LEADER
 	}
 
@@ -351,8 +341,6 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	isLeader = s.isLeader
 	s.isLeaderMutex.RUnlock()
 	if !isLeader {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, "After sending heartbeat: not the leader")
 		return &Success{Flag: false}, ERR_NOT_LEADER
 	}
 
@@ -363,12 +351,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 		}
 	}
 
-	// WARN: comment out the log before submission
-	log.Println("alive count: ", aliveServerNum)
-
 	if float64(aliveServerNum) >= math.Ceil(float64(nodeCount+1)/2) {
-		// WARN: comment out the log before submission
-		log.Println(s.addr, " Majority alive!")
 		isMajAlive = true
 	}
 
@@ -376,8 +359,6 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 }
 
 func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *AppendEntryOutput, wg *sync.WaitGroup) {
-	log.Println("")
-	log.Println("----------", s.serverId, " HandleSendingHeartbeat to", peerInfo.serverId, "----------")
 	defer wg.Done()
 	var rcvOutput *AppendEntryOutput
 
@@ -400,7 +381,6 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 		// set entry if there are any
 		var entry []*UpdateOperation
 		if !peerInfo.isFirstMsg && len(s.log)-1 != int(peerInfo.matchIndex) {
-			log.Println("Set up entries to heartbeat msg")
 			entry = s.log[peerInfo.matchIndex+1:]
 		}
 		currEntry := AppendEntryInput{
@@ -410,14 +390,6 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 			Entries:      entry,
 			LeaderCommit: s.commitIndex,
 		}
-		log.Println("------AppendEntryInput(", peerInfo.serverId, ")------")
-		log.Println("PrevLogIndex: ", currEntry.PrevLogIndex)
-		log.Println("PrevLogTerm: ", currEntry.PrevLogTerm)
-		log.Println("Term: ", currEntry.Term)
-		log.Println("Entries: ", currEntry.Entries)
-		log.Println("LeaderCommit: ", currEntry.LeaderCommit)
-		log.Println("------END------")
-		log.Println(" ")
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
@@ -428,13 +400,7 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 				break
 			}
 		}
-		log.Println("------AppendEntryOutput(", peerInfo.serverId, ")------")
-		log.Println("Success: ", op.Success)
-		log.Println("ServerId: ", op.ServerId)
-		log.Println("Term: ", op.Term)
-		log.Println("MatchedIndex: ", op.MatchedIndex)
-		log.Println("------END------")
-		log.Println(" ")
+
 		if err == nil {
 			// TODO: update the peerInfo based on the AppendEntryOutput
 			peerInfo.isFirstMsg = false

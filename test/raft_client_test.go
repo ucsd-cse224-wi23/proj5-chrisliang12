@@ -1,8 +1,10 @@
 package SurfTest
 
 import (
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	//	"time"
@@ -182,7 +184,7 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	defer worker2.CleanUp()
 
 	file1 := "multi_file1.txt"
-	file2 := "multi_file1.txt"
+	file2 := "multi_file2.txt"
 	err := worker1.AddFile(file1)
 	if err != nil {
 		t.FailNow()
@@ -193,7 +195,22 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 		t.FailNow()
 	}
 
-	err = worker1.UpdateFile(file2, "update test")
+	err = worker2.AddFile(file1)
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = worker2.AddFile(file2)
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = worker2.UpdateFile(file1, "abcdefg")
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = worker2.UpdateFile(file2, "akdlsjfieqw")
 	if err != nil {
 		t.FailNow()
 	}
@@ -201,11 +218,21 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
 	test.Clients[2].Crash(test.Context, &emptypb.Empty{})
 
+	fmt.Println("\n-------- leader 1 start sync--------")
 	err = SyncClient("localhost:8080", "test0", BLOCK_SIZE, cfgPath)
 	if err == nil {
 		t.Fatalf("Sync should fail")
 	}
 	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+	time.Sleep(time.Second)
+	fmt.Println("-------- leader 1 end sync-------- \n ")
+
+	internalState_before, err := test.Clients[0].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	fmt.Println("\n------leader1 log (all other nodes crash): \n", internalState_before.Log, "\n ")
 
 	// leader 1 crashes
 	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
@@ -214,6 +241,26 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
 	test.Clients[2].Restore(test.Context, &emptypb.Empty{})
 
+	// set leader2
 	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
 	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	// leader1 is restored
+	test.Clients[0].Restore(test.Context, &emptypb.Empty{})
+
+	// leader 2 get several requests
+	fmt.Println("\n-------- leader 2 start sync--------")
+	err = SyncClient("localhost:8080", "test1", BLOCK_SIZE, cfgPath)
+	if err != nil {
+		t.Fatalf("Sync failed")
+	}
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+	fmt.Println("-------- leader 2 end sync-------- \n ")
+
+	internalState, err := test.Clients[0].GetInternalState(test.Context, &emptypb.Empty{})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	fmt.Println("\n------leader1 log (after leader2 sync): \n", internalState.Log, "\n ")
 }

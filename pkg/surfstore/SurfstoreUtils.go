@@ -97,7 +97,7 @@ func ClientSync(client RPCClient) {
 				if err := client.GetFileInfoMap(&remoteIndex); err != nil {
 					log.Println("Error: loading remote index", err)
 				}
-				PrintMetaMap(remoteIndex)
+				// PrintMetaMap(remoteIndex)
 				if err != nil {
 					log.Println("Error: uploading <", fileInfo.Name(), "> | msg: ", err)
 				}
@@ -148,7 +148,7 @@ func ClientSync(client RPCClient) {
 				localIndex[filename] = remoteMetaData
 			}
 		} else {
-			PrintMetaMap(remoteIndex)
+			// PrintMetaMap(remoteIndex)
 			err := download(client, localMetaData, remoteMetaData)
 			if err != nil {
 				log.Println("Error: downloadindg <", filename, "> | msg: ", err)
@@ -157,7 +157,7 @@ func ClientSync(client RPCClient) {
 		}
 	}
 	log.Println("local index:")
-	PrintMetaMap(localIndex)
+	// PrintMetaMap(localIndex)
 
 	WriteMetaFile(localIndex, client.BaseDir)
 }
