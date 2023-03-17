@@ -94,3 +94,30 @@ func ServeRaftServer(server *RaftSurfstore) error {
 	}
 	return nil
 }
+
+func PrintAppendEntryInput(entry *AppendEntryInput, srcServerId, tarServerId int64) {
+	log.Println("--------AppendEntries Input ", srcServerId, " to ", tarServerId, "--------")
+	log.Println("From <", srcServerId, "> To <", tarServerId, "> | Term: ", entry.Term)
+	log.Println("From <", srcServerId, "> To <", tarServerId, "> | PrevLogIndexv: ", entry.PrevLogIndex)
+	log.Println("From <", srcServerId, "> To <", tarServerId, "> | PrevLogTerm: ", entry.PrevLogTerm)
+	log.Println("From <", srcServerId, "> To <", tarServerId, "> | Entries: ", entry.Entries)
+	log.Println("From <", srcServerId, "> To <", tarServerId, "> | LeaderCommit: ", entry.LeaderCommit)
+	log.Println("-------------END---------------")
+}
+
+func PrintAPpendEntryOutput(entry *AppendEntryOutput, srcServerId, tarServerId int64) {
+	log.Println("--------AppendEntries Output ", srcServerId, " to ", tarServerId, "--------")
+	log.Println("From <", tarServerId, "> | Success: ", entry.Success)
+	log.Println("From <", tarServerId, "> | Term: ", entry.Term)
+	log.Println("From <", tarServerId, "> | MatchedIndex: ", entry.MatchedIndex)
+	log.Println("-------------END---------------")
+}
+
+func PrintPeerInfo(info *PeerInfo) {
+	log.Println("--------PeerInfo ", info.serverId, "--------")
+	log.Println("PeerInfo <", info.serverId, "> | Addr: ", info.addr)
+	log.Println("PeerInfo <", info.serverId, "> | NextIdx: ", info.nextIndex)
+	log.Println("PeerInfo <", info.serverId, "> | MatchedIdx: ", info.matchIndex)
+	log.Println("PeerInfo <", info.serverId, "> | isFirstMsg: ", info.isFirstMsg)
+	log.Println("-------------END---------------")
+}

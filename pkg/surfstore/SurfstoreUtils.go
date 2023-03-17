@@ -26,6 +26,7 @@ func ClientSync(client RPCClient) {
 	remoteIndex := make(map[string]*FileMetaData)
 	if err := client.GetFileInfoMap(&remoteIndex); err != nil {
 		log.Println("Error: loading remote index", err)
+		log.Fatal("err")
 	}
 
 	localDirMap := make(map[string][]string)
