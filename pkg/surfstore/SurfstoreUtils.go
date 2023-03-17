@@ -30,7 +30,6 @@ func ClientSync(client RPCClient) {
 	}
 
 	localDirMap := make(map[string][]string)
-	uploadFail := false
 	for _, fileInfo := range localFiles {
 		if fileInfo.Name() == "index.db" {
 			continue
@@ -70,7 +69,6 @@ func ClientSync(client RPCClient) {
 					// if local version is higher, need to update remote
 					err := upload(client, localMetaData, numBlock)
 					if err != nil {
-						uploadFail = true
 						log.Println("Error: uploading <", fileInfo.Name(), "> | msg: ", err)
 					}
 				}
@@ -81,7 +79,6 @@ func ClientSync(client RPCClient) {
 				if localVersion == remoteVersion {
 					err := upload(client, &FileMetaData{Filename: fileInfo.Name(), Version: localVersion, BlockHashList: localDirMap[fileInfo.Name()]}, numBlock)
 					if err != nil {
-						uploadFail = true
 						log.Println("Error: uploading <", fileInfo.Name(), "> | msg: ", err)
 					}
 					localIndex[fileInfo.Name()].BlockHashList = localDirMap[fileInfo.Name()]
@@ -99,9 +96,6 @@ func ClientSync(client RPCClient) {
 					tempFileMetaData = &FileMetaData{Filename: fileInfo.Name(), Version: 0, BlockHashList: localDirMap[fileInfo.Name()]}
 				}
 				err := upload(client, tempFileMetaData, numBlock)
-				if err != nil {
-					uploadFail = true
-				}
 				if err := client.GetFileInfoMap(&remoteIndex); err != nil {
 					log.Println("Error: loading remote index", err)
 				}
@@ -167,10 +161,6 @@ func ClientSync(client RPCClient) {
 	// PrintMetaMap(localIndex)
 
 	WriteMetaFile(localIndex, client.BaseDir)
-
-	if uploadFail {
-		log.Fatal("Upload Fail")
-	}
 }
 
 func reverseBlockStoreMap(blockStoreMap *map[string][]string, blockToServer *map[string]string) {

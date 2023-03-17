@@ -160,7 +160,7 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 		}
 
 		succ, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
-		if err != nil || !succ.Flag {
+		if err != nil {
 			return &Version{Version: -1}, err
 		}
 
