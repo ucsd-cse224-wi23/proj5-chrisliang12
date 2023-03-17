@@ -181,13 +181,13 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	test.Clients[1].Crash(test.Context, &emptypb.Empty{})
 	test.Clients[2].Crash(test.Context, &emptypb.Empty{})
 
-	test.Clients[0].UpdateFile(test.Context, &surfstore.FileMetaData{
+	go test.Clients[0].UpdateFile(test.Context, &surfstore.FileMetaData{
 		Filename: "testFile1",
 		Version:  1,
 	})
 	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
 
-	test.Clients[0].UpdateFile(test.Context, &surfstore.FileMetaData{
+	go test.Clients[0].UpdateFile(test.Context, &surfstore.FileMetaData{
 		Filename: "testFile2",
 		Version:  1,
 	})
@@ -202,6 +202,7 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 
 	// leader 1 crashes
 	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
+	fmt.Println("--------------------Leader1 crashed ----------------------------")
 
 	// all other nodes restore
 	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
@@ -212,7 +213,7 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
 	// leader2 gets a request
-	test.Clients[1].UpdateFile(test.Context, &surfstore.FileMetaData{
+	go test.Clients[1].UpdateFile(test.Context, &surfstore.FileMetaData{
 		Filename: "file3",
 		Version:  1,
 	})

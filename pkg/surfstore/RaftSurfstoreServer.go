@@ -4,7 +4,6 @@ import (
 	context "context"
 	"log"
 	"math"
-	"strings"
 	"sync"
 	"time"
 
@@ -145,33 +144,22 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	// if majority node fail, block the operation until majority recover
 	// NOTE: This round of SendingHeartbeat is for log replication (not commitment)
 	for {
-		s.isLeaderMutex.RLock()
-		isLeader := s.isLeader
-		s.isLeaderMutex.RUnlock()
-		if !isLeader {
-			return &Version{Version: -1}, ERR_NOT_LEADER
-		}
-
-		s.isCrashedMutex.RLock()
-		isCrashed := s.isCrashed
-		s.isCrashedMutex.RUnlock()
-		if isCrashed {
-			return &Version{Version: -1}, ERR_SERVER_CRASHED
-		}
-
 		succ, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 		if err != nil {
 			return &Version{Version: -1}, err
 		}
 
-		if succ.Flag && len(s.log)-1 > int(s.commitIndex) {
-			for i := s.commitIndex + 1; i < int64(len(s.log)); i++ {
-				if s.log[i].Term == s.term {
-					s.commitIndex = i
+		if succ.Flag {
+			if len(s.log)-1 > int(s.commitIndex) {
+				for i := s.commitIndex + 1; i < int64(len(s.log)); i++ {
+					if s.log[i].Term == s.term {
+						s.commitIndex = i
+					}
 				}
 			}
 			break
 		}
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	// NOTE: Commit since majority of nodes have the log
@@ -328,7 +316,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	wg.Add(nodeCount)
 	// send heartbeat in parallel
 	for _, info := range s.peerInfo {
-		go s.handleSendingHeartbeat(info, res, &wg)
+		go s.handleSendingHeartbeat(info, res, &wg, ctx)
 	}
 
 	// check the response
@@ -352,7 +340,7 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	return &Success{Flag: isMajAlive}, nil
 }
 
-func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *AppendEntryOutput, wg *sync.WaitGroup) {
+func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *AppendEntryOutput, wg *sync.WaitGroup, ctx context.Context) {
 	PrintPeerInfo(peerInfo)
 	defer wg.Done()
 	var rcvOutput *AppendEntryOutput
@@ -387,15 +375,11 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 		}
 		PrintAppendEntryInput(&currEntry, s.serverId, peerInfo.serverId)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
 		op, err := client.AppendEntries(ctx, &currEntry)
 		peerInfo.isFirstMsg = false
 		if err != nil {
-			if strings.Contains(err.Error(), ERR_SERVER_CRASHED.Error()) {
-				rcvOutput = op
-				break
-			}
+			rcvOutput = op
+			break
 		}
 
 		if err == nil {
