@@ -2,7 +2,6 @@ package surfstore
 
 import (
 	context "context"
-	"log"
 	"math"
 	"sync"
 	"time"
@@ -102,15 +101,11 @@ func (s *RaftSurfstore) GetBlockStoreAddrs(ctx context.Context, empty *emptypb.E
 }
 
 func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) (*Version, error) {
-	log.Println(" ")
-	log.Println("----------", s.serverId, " UpdateFile----------")
-
 	// sanity check
 	s.isCrashedMutex.RLock()
 	isCrashed := s.isCrashed
 	s.isCrashedMutex.RUnlock()
 	if isCrashed {
-		log.Println("--", s.serverId, " crashed")
 		return nil, ERR_SERVER_CRASHED
 	}
 
@@ -118,7 +113,6 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	isLeader := s.isLeader
 	s.isLeaderMutex.RUnlock()
 	if !isLeader {
-		log.Println("--", s.serverId, " not leader")
 		return nil, ERR_NOT_LEADER
 	}
 
@@ -138,7 +132,6 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	}
 
 	s.log = append(s.log, &newEntry)
-	log.Println(s.serverId, "Append new log entry, now the log are ", s.log)
 
 	// send heartbeat to replicate log
 	// if majority node fail, block the operation until majority recover
@@ -167,12 +160,9 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 	v, _ := s.metaStore.UpdateFile(ctx, filemeta)
 
 	// NOTE: Send another round of heartbeat to commit the log
-	log.Println(" ")
-	log.Println("----------", s.serverId, " UpdateFile: commit msg start sending----------")
 
 	_, err := s.SendHeartbeat(ctx, &emptypb.Empty{})
 	if err != nil {
-		log.Println("serverId: ", s.serverId, "commit fail")
 		return v, err
 	}
 
@@ -188,9 +178,6 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
-	if s.serverId == 0 {
-		log.Println("\nServer 0's log: ", s.log, "\n ")
-	}
 	// WARN: comment out the log before submission
 	res := AppendEntryOutput{
 		Success:      false,
@@ -267,14 +254,11 @@ func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInp
 
 func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Success, error) {
 	// WARN: comment out the log before submission
-	log.Println("")
-	log.Println("----------Set Leader to ", s.serverId, "----------")
 	// sanity check
 	s.isCrashedMutex.RLock()
 	isCrashed := s.isCrashed
 	s.isCrashedMutex.RUnlock()
 	if isCrashed {
-		log.Println(s.serverId, " crashed when setting to leader")
 		return &Success{Flag: false}, ERR_SERVER_CRASHED
 	}
 
@@ -293,9 +277,6 @@ func (s *RaftSurfstore) SetLeader(ctx context.Context, _ *emptypb.Empty) (*Succe
 		info.isFirstMsg = true
 		info.infoMutex.Unlock()
 	}
-
-	log.Println(s.serverId, "curr log: ", s.log)
-	log.Println("----------Set Leader End ", s.serverId, "----------")
 
 	return &Success{Flag: true}, nil
 }
@@ -339,7 +320,6 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 	}
 
 	if float64(aliveServerNum) >= math.Ceil(float64(nodeCount+1)/2) {
-		log.Println(s.serverId, " majority alive")
 		isMajAlive = true
 	}
 
@@ -361,9 +341,6 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 	for {
 		isFirstMsg := peerInfo.isFirstMsg
 
-		if peerInfo.serverId == 0 {
-			PrintPeerInfo(peerInfo)
-		}
 		// set prevLogTerm and Index based on peerInfo
 		prevLogIndex := peerInfo.nextIndex - 1
 		prevLogTerm := int64(0)
@@ -383,9 +360,6 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 			Entries:      entry,
 			LeaderCommit: s.commitIndex,
 		}
-		if peerInfo.serverId == 0 {
-			PrintAppendEntryInput(&currEntry, s.serverId, peerInfo.serverId)
-		}
 
 		op, err := client.AppendEntries(ctx, &currEntry)
 		if err != nil {
@@ -395,9 +369,6 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 
 		if err == nil {
 			peerInfo.isFirstMsg = false
-			if peerInfo.serverId == 0 {
-				PrintAPpendEntryOutput(op, s.serverId, peerInfo.serverId)
-			}
 
 			// if the resp has a higher term, which means there is a new isLeader
 			// set the isLeader to false and return

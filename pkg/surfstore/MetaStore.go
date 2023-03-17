@@ -2,7 +2,6 @@ package surfstore
 
 import (
 	context "context"
-	"log"
 	"sync"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -46,9 +45,6 @@ func (m *MetaStore) UpdateFile(ctx context.Context, fileMetaData *FileMetaData) 
 	version := fileMetaData.Version
 	m.mutex.Lock()
 	d, ok := m.FileMetaMap[fileName]
-	if ok {
-		log.Println("uploading ver: ", version, " | remote ver: ", d.Version)
-	}
 	if ok {
 		if version == d.Version+1 {
 			m.FileMetaMap[fileName] = fileMetaData
