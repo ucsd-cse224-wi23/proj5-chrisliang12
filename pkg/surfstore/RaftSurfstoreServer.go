@@ -188,6 +188,9 @@ func (s *RaftSurfstore) UpdateFile(ctx context.Context, filemeta *FileMetaData) 
 // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index
 // of last new entry)
 func (s *RaftSurfstore) AppendEntries(ctx context.Context, input *AppendEntryInput) (*AppendEntryOutput, error) {
+	if s.serverId == 0 {
+		log.Println("\nServer 0's log: ", s.log, "\n ")
+	}
 	// WARN: comment out the log before submission
 	res := AppendEntryOutput{
 		Success:      false,
@@ -344,9 +347,6 @@ func (s *RaftSurfstore) SendHeartbeat(ctx context.Context, _ *emptypb.Empty) (*S
 }
 
 func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *AppendEntryOutput, wg *sync.WaitGroup, ctx context.Context) {
-	if peerInfo.serverId == 0 {
-		PrintPeerInfo(peerInfo)
-	}
 	defer wg.Done()
 	var rcvOutput *AppendEntryOutput
 
@@ -359,6 +359,11 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 	client := NewRaftSurfstoreClient(conn)
 
 	for {
+		isFirstMsg := peerInfo.isFirstMsg
+
+		if peerInfo.serverId == 0 {
+			PrintPeerInfo(peerInfo)
+		}
 		// set prevLogTerm and Index based on peerInfo
 		prevLogIndex := peerInfo.nextIndex - 1
 		prevLogTerm := int64(0)
@@ -368,7 +373,7 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 
 		// set entry if there are any
 		var entry []*UpdateOperation
-		if !peerInfo.isFirstMsg && len(s.log)-1 != int(peerInfo.matchIndex) {
+		if !peerInfo.isFirstMsg && len(s.log)-1 > int(peerInfo.matchIndex) {
 			entry = s.log[peerInfo.matchIndex+1:]
 		}
 		currEntry := AppendEntryInput{
@@ -383,13 +388,13 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 		}
 
 		op, err := client.AppendEntries(ctx, &currEntry)
-		peerInfo.isFirstMsg = false
 		if err != nil {
 			rcvOutput = op
 			break
 		}
 
 		if err == nil {
+			peerInfo.isFirstMsg = false
 			if peerInfo.serverId == 0 {
 				PrintAPpendEntryOutput(op, s.serverId, peerInfo.serverId)
 			}
@@ -412,20 +417,28 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 				peerInfo.infoMutex.Unlock()
 			}
 
+			// if there is no MatchedIndex, decline the prevLogIndex
+			if op.MatchedIndex == -1 && !op.Success {
+				peerInfo.infoMutex.Lock()
+				if peerInfo.nextIndex > 0 {
+					peerInfo.nextIndex--
+				}
+				peerInfo.matchIndex = -1
+				peerInfo.infoMutex.Unlock()
+			}
+
+			if isFirstMsg {
+				continue
+			}
+
 			// if success, break the loop and return
 			if op.Success {
 				rcvOutput = op
 				break
 			}
 
-			// if there is no MatchedIndex, decline the prevLogIndex
-			if op.MatchedIndex == -1 {
-				peerInfo.infoMutex.Lock()
-				peerInfo.nextIndex--
-				peerInfo.matchIndex = -1
-				peerInfo.infoMutex.Unlock()
-			}
 		}
+		time.Sleep(time.Microsecond * 100)
 	}
 	res <- rcvOutput
 }
