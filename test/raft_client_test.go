@@ -2,9 +2,9 @@ package SurfTest
 
 import (
 	"cse224/proj5/pkg/surfstore"
-	"fmt"
 	"log"
 	"os"
+	"sync"
 	"testing"
 
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -194,16 +194,16 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 	})
 	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
 
-	state, err := test.Clients[0].GetInternalState(test.Context, &emptypb.Empty{})
+	_, err := test.Clients[0].GetInternalState(test.Context, &emptypb.Empty{})
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	fmt.Println("\n------leader1 log (all other nodes crash): \n", state.Log, "\n ")
+	// fmt.Println("\n------leader1 log (all other nodes crash): \n", state.Log, "\n ")
 
 	// leader 1 crashes
 	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
-	fmt.Println("--------------------Leader1 crashed ----------------------------")
+	// fmt.Println("--------------------Leader1 crashed ----------------------------")
 
 	// all other nodes restore
 	test.Clients[1].Restore(test.Context, &emptypb.Empty{})
@@ -235,7 +235,7 @@ func TestRaftLogsCorrectlyOverwritten(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	fmt.Println("\n------leader1 log (after leader2 sync): \n", internalStateLeader1.Log, "\n ")
+	// fmt.Println("\n------leader1 log (after leader2 sync): \n", internalStateLeader1.Log, "\n ")
 
 	if len(internalStateLeader1.Log) != len(internalStateLeader2.Log) {
 		t.Fatalf("log inconsistent!")
@@ -361,7 +361,7 @@ func TestRaftLogsConsistent(t *testing.T) {
 	test.Clients[4].Crash(test.Context, &emptypb.Empty{})
 
 	// leader 1 gets a req while a minority of the cluster is down
-	go test.Clients[0].UpdateFile(test.Context, &surfstore.FileMetaData{
+	test.Clients[0].UpdateFile(test.Context, &surfstore.FileMetaData{
 		Filename: "file1",
 		Version:  1,
 	})
@@ -378,16 +378,22 @@ func TestRaftLogsConsistent(t *testing.T) {
 	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
 	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	// leader 2 gets a req
-	go test.Clients[1].UpdateFile(test.Context, &surfstore.FileMetaData{
-		Filename: "file2",
-		Version:  1,
-	})
-	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+	go func() {
+		defer wg.Done()
+		test.Clients[1].UpdateFile(test.Context, &surfstore.FileMetaData{
+			Filename: "file2",
+			Version:  1,
+		})
+		test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+	}()
 
 	// leader1 restore
 	test.Clients[0].Restore(test.Context, &emptypb.Empty{})
 
+	wg.Wait()
 	// final heartbeat before validation
 	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
 
@@ -401,9 +407,9 @@ func TestRaftLogsConsistent(t *testing.T) {
 		log.Println("<server ", i, ">: ", state.Log)
 	}
 
-	// for _, st := range stateList {
-	// 	if len(st.Log) != 2 {
-	// 		log.Fatalf("log length incorrect")
-	// 	}
-	// }
+	for i, s := range stateList {
+		if len(s.Log) != 2 {
+			log.Fatal("Incorrect Log Length in server <", i, ">\n")
+		}
+	}
 }

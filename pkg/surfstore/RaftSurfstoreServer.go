@@ -438,7 +438,7 @@ func (s *RaftSurfstore) handleSendingHeartbeat(peerInfo *PeerInfo, res chan *App
 			}
 
 		}
-		time.Sleep(time.Microsecond * 100)
+		// time.Sleep(time.Microsecond * 100)
 	}
 	res <- rcvOutput
 }
