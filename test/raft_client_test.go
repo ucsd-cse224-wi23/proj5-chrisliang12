@@ -3,6 +3,7 @@ package SurfTest
 import (
 	"cse224/proj5/pkg/surfstore"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 
@@ -345,5 +346,64 @@ func TestRaftNewLeaderPushesUpdates(t *testing.T) {
 	// }
 	// if len(internalStateLeader5.MetaMap.FileInfoMap) != 0 {
 	// 	t.Fatalf("leader5 should not commit the data")
+	// }
+}
+
+func TestRaftLogsConsistent(t *testing.T) {
+	t.Logf("leader1 gets a request while a minority of the cluster is down. leader1 crashes. the other crashed nodes are restored. leader2 gets a request. leader1 is restored.")
+	cfgPath := "./config_files/5nodes.txt"
+	test := InitTest(cfgPath)
+	defer EndTest(test)
+	test.Clients[0].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	test.Clients[3].Crash(test.Context, &emptypb.Empty{})
+	test.Clients[4].Crash(test.Context, &emptypb.Empty{})
+
+	// leader 1 gets a req while a minority of the cluster is down
+	go test.Clients[0].UpdateFile(test.Context, &surfstore.FileMetaData{
+		Filename: "file1",
+		Version:  1,
+	})
+	test.Clients[0].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	// leader 1 crashes
+	test.Clients[0].Crash(test.Context, &emptypb.Empty{})
+
+	// all other nodes are restored
+	test.Clients[3].Restore(test.Context, &emptypb.Empty{})
+	test.Clients[4].Restore(test.Context, &emptypb.Empty{})
+
+	// leader 2
+	test.Clients[1].SetLeader(test.Context, &emptypb.Empty{})
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	// leader 2 gets a req
+	go test.Clients[1].UpdateFile(test.Context, &surfstore.FileMetaData{
+		Filename: "file2",
+		Version:  1,
+	})
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	// leader1 restore
+	test.Clients[0].Restore(test.Context, &emptypb.Empty{})
+
+	// final heartbeat before validation
+	test.Clients[1].SendHeartbeat(test.Context, &emptypb.Empty{})
+
+	stateList := []*surfstore.RaftInternalState{}
+	for i := 0; i < 5; i++ {
+		state, err := test.Clients[i].GetInternalState(test.Context, &emptypb.Empty{})
+		if err != nil {
+			log.Fatalf("error reading internal state")
+		}
+		stateList = append(stateList, state)
+		log.Println("<server ", i, ">: ", state.Log)
+	}
+
+	// for _, st := range stateList {
+	// 	if len(st.Log) != 2 {
+	// 		log.Fatalf("log length incorrect")
+	// 	}
 	// }
 }
