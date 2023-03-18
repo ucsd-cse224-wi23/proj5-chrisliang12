@@ -6,25 +6,24 @@ import (
 	"sort"
 )
 
-type Node struct {
-	next *Node
-	hash string
-}
-
 type ConsistentHashRing struct {
 	ServerMap map[string]string
-	RingHead  *Node
+	HashRing  []*string
 }
 
+// use binary search to find the Responsible Server
 func (c ConsistentHashRing) GetResponsibleServer(blockId string) string {
-	ptr := c.RingHead
-	for i := 0; i < len(c.ServerMap); i++ {
-		if blockId < ptr.hash {
-			break
+	l, r := 0, len(c.HashRing)
+	for l < r {
+		mid := l + (r-l)/2
+		if *(c.HashRing[mid]) < blockId {
+			l = mid + 1
+		} else {
+			r = mid
 		}
-		ptr = ptr.next
 	}
-	return c.ServerMap[ptr.hash]
+
+	return c.ServerMap[*(c.HashRing[l])]
 }
 
 func (c ConsistentHashRing) Hash(addr string) string {
@@ -33,28 +32,33 @@ func (c ConsistentHashRing) Hash(addr string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+type sortableSlice []*string
+
+func (s sortableSlice) Len() int {
+	return len(s)
+}
+
+func (s sortableSlice) Less(i, j int) bool {
+	return *s[i] < *s[j]
+}
+
+func (s sortableSlice) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
 func NewConsistentHashRing(serverAddrs []string) *ConsistentHashRing {
 	var cstHashRing ConsistentHashRing
 	serverMap := make(map[string]string)
-	hashes := []string{}
+	hashes := []*string{}
 
 	for _, serverAddr := range serverAddrs {
 		currServerName := "blockstore" + serverAddr
 		serverHash := cstHashRing.Hash(currServerName)
 		serverMap[serverHash] = serverAddr
-		hashes = append(hashes, serverHash)
+		hashes = append(hashes, &serverHash)
 	}
-	sort.Strings(hashes)
+	sort.Sort(sortableSlice(hashes))
 
-	head := Node{hash: hashes[0]}
-	nodePtr := &head
-	for _, hash := range hashes[1:] {
-		newNode := Node{hash: hash}
-		nodePtr.next = &newNode
-		nodePtr = nodePtr.next
-	}
-	nodePtr.next = &head
-
-	cstHashRing = ConsistentHashRing{ServerMap: serverMap, RingHead: &head}
+	cstHashRing = ConsistentHashRing{ServerMap: serverMap, HashRing: hashes}
 	return &cstHashRing
 }
