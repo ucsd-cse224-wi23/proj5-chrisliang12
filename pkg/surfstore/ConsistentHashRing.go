@@ -23,6 +23,10 @@ func (c ConsistentHashRing) GetResponsibleServer(blockId string) string {
 		}
 	}
 
+	if l == len(c.HashRing) {
+		return c.ServerMap[*(c.HashRing[0])]
+	}
+
 	return c.ServerMap[*(c.HashRing[l])]
 }
 
